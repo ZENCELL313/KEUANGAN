@@ -26,7 +26,6 @@
         header h1 { font-size: 18px; font-weight: 700; color: #FACC15; }
         header p { font-size: 11px; opacity: 0.8; margin-top: 2px; }
 
-        /* Top Executive Summary Cards */
         .top-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
         .top-summary-card { 
             background: #FFFFFF; 
@@ -40,22 +39,9 @@
             align-items: center;
             justify-content: center;
         }
-        .top-summary-card .icon-box {
-            font-size: 18px;
-            margin-bottom: 3px;
-        }
-        .top-summary-card .lbl { 
-            font-size: 10px; 
-            font-weight: 700; 
-            color: #64748B; 
-            text-transform: uppercase; 
-            margin-bottom: 4px; 
-            letter-spacing: 0.3px;
-        }
-        .top-summary-card .val { 
-            font-size: 13px; 
-            font-weight: 800; 
-        }
+        .top-summary-card .icon-box { font-size: 18px; margin-bottom: 3px; }
+        .top-summary-card .lbl { font-size: 10px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.3px; }
+        .top-summary-card .val { font-size: 13px; font-weight: 800; }
 
         .nav-tabs { display: flex; gap: 4px; margin-bottom: 12px; background: #E2E8F0; padding: 4px; border-radius: 10px; overflow-x: auto; }
         .tab-btn { flex: 1; padding: 10px 4px; border: none; background: transparent; font-size: 11px; font-weight: 700; color: #475569; border-radius: 8px; cursor: pointer; transition: 0.2s; text-align: center; white-space: nowrap; text-transform: uppercase; }
@@ -82,7 +68,6 @@
         .btn-delete { background-color: #EF4444; color: #FFF; border: none; padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background-color: #64748B; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 6px; display: none; }
 
-        /* Modern Table */
         table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
         th, td { padding: 8px 8px; text-align: right; border: 1px solid var(--border); }
         th { background-color: #F1F5F9; color: #334155; font-weight: 700; text-align: center; }
@@ -90,7 +75,6 @@
         tr:hover { background-color: #F8FAFC; }
 
         .col-nama-saldo { width: 35%; max-width: 140px; }
-
         .th-blue { background-color: var(--header-blue); color: white; border-color: #0284C7; }
         .th-pemasukan { background-color: #FEF08A; color: #854D0E; }
         .th-pengeluaran { background-color: #BBF7D0; color: #166534; }
@@ -108,6 +92,7 @@
         .modal-box.active { display: block; }
         .vlookup-badge { font-size: 10px; color: #2563EB; font-weight: 600; margin-top: 3px; display: none; }
         #statusMsg { font-size: 11px; font-weight: bold; text-align: center; margin-top: 6px; }
+        #cloudStatus { font-size: 10px; text-align: center; padding: 4px; background: #E0F2FE; color: #0369A1; border-radius: 6px; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -117,7 +102,8 @@
         <p>Aplikasi Catatan Transaksi Harian</p>
     </header>
 
-    <!-- Ringkasan Eksekutif Atas -->
+    <div id="cloudStatus">🔄 Menghubungkan & mengambil data dari Google Cloud...</div>
+
     <div class="top-summary-grid">
         <div class="top-summary-card">
             <div class="icon-box">📈</div>
@@ -136,7 +122,6 @@
         </div>
     </div>
 
-    <!-- Navigasi Tab -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab(event, 'tab-harian')">📝 TRANSAKSI HARIAN</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-rekap-harian')">📅 REKAP HARIAN</button>
@@ -350,7 +335,8 @@
     </div>
 
     <script>
-        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzFldxpWc6opE9urGSw11xtLEH8p3i8vRUsJLRIvEeg61bJehvFL8AlWyZdzhuRCEAKhw/exec";
+        // URL WEB APP APPS SCRIPT BARU
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPtfv5DAAKgzH_FVxrKX5Cg43fTSiiyRDKK2sGschbi26npMmu03wIQAVwSHPmpzgpag/exec";
 
         const formatRp = (num) => {
             if (num === null || num === undefined || isNaN(num)) return '-';
@@ -396,6 +382,43 @@
         let defaultSaldoAwal = {};
         saldoList.forEach(s => defaultSaldoAwal[s] = 0);
         let saldoAwalData = JSON.parse(localStorage.getItem('saldoAwalData')) || defaultSaldoAwal;
+
+        function loadCloudData() {
+            const statusEl = document.getElementById('cloudStatus');
+            statusEl.style.display = 'block';
+            statusEl.innerText = '🔄 Sinkronisasi data dari Cloud...';
+
+            fetch(GOOGLE_SCRIPT_URL)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.transaksi && data.transaksi.length > 0) {
+                        transaksiJurnal = data.transaksi;
+                        localStorage.setItem('transaksiJurnal', JSON.stringify(transaksiJurnal));
+                    }
+                    if (data.saldoAwal && Object.keys(data.saldoAwal).length > 0) {
+                        saldoAwalData = Object.assign({}, defaultSaldoAwal, data.saldoAwal);
+                        localStorage.setItem('saldoAwalData', JSON.stringify(saldoAwalData));
+                    }
+                    if (data.vlookup && Object.keys(data.vlookup).length > 0) {
+                        vlookupMaster = Object.assign({}, defaultMaster, data.vlookup);
+                        localStorage.setItem('vlookupMaster', JSON.stringify(vlookupMaster));
+                    }
+                    statusEl.style.background = '#DCFCE7';
+                    statusEl.style.color = '#15803D';
+                    statusEl.innerText = '✅ Data Berhasil Disinkronkan dengan Cloud!';
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+
+                    initDropdowns();
+                    initSaldoGrid();
+                    renderTables();
+                })
+                .catch(err => {
+                    statusEl.style.background = '#FEE2E2';
+                    statusEl.style.color = '#B91C1C';
+                    statusEl.innerText = '⚠️ Gunakan Mode Offline (Gagal terhubung ke Cloud)';
+                    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                });
+        }
 
         function switchTab(evt, tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -457,8 +480,17 @@
                 }
             });
             localStorage.setItem('saldoAwalData', JSON.stringify(saldoAwalData));
+            
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'updateSaldoAwal', payload: saldoAwalData })
+            });
+
             toggleModal('saldoModal');
             renderTables();
+            alert('Saldo Awal tersimpan & dikirim ke Cloud!');
         }
 
         document.getElementById('keterangan').addEventListener('input', function(e) {
@@ -485,10 +517,18 @@
 
             vlookupMaster[ket] = { kat, kas, akun };
             localStorage.setItem('vlookupMaster', JSON.stringify(vlookupMaster));
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'updateVlookup', payload: vlookupMaster })
+            });
+
             document.getElementById('v_ket').value = '';
             initDropdowns();
             toggleModal('modalVlookup');
-            alert(`Aturan VLOOKUP untuk "${ket}" berhasil disimpan!`);
+            alert(`Aturan VLOOKUP "${ket}" tersimpan & disinkronkan!`);
         });
 
         document.getElementById('formTrx').addEventListener('submit', function(e) {
@@ -518,6 +558,7 @@
             }
 
             const payload = {
+                action: 'addTrx',
                 waktu: waktuStr,
                 isoDate: isoDateStr,
                 keterangan: ket,
@@ -548,7 +589,7 @@
             })
             .catch(err => {
                 statusEl.style.color = '#EF4444';
-                statusEl.innerText = '⚠️ Tersimpan Lokal (Gagal ke Cloud)';
+                statusEl.innerText = '⚠️️ Tersimpan Lokal (Gagal ke Cloud)';
             });
 
             cancelEdit();
@@ -598,7 +639,6 @@
         }
 
         function renderTables() {
-            // 1. Render Jurnal Transaksi
             const bJurnal = document.getElementById('bodyJurnal');
             if (transaksiJurnal.length === 0) {
                 bJurnal.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#94A3B8;">Belum ada transaksi.</td></tr>`;
@@ -625,7 +665,6 @@
                 }).join('');
             }
 
-            // 2. Render Rekap Harian
             const bRekapHarian = document.getElementById('bodyRekapHarian');
             bRekapHarian.innerHTML = '';
             
@@ -689,7 +728,6 @@
             totBersihEl.innerText = formatRp(grandBersih);
             totBersihEl.className = (grandBersih >= 0 ? 'text-kredit' : 'text-debit');
 
-            // 3. Render Rekap Pembukuan
             let rekapKat = {};
             kategoriList.forEach(k => rekapKat[k] = { jml: 0, debit: 0, kredit: 0 });
 
@@ -720,7 +758,6 @@
                 `;
             }).join('');
 
-            // 4. Render Rekap Saldo & Pengurangan 3 Akun Titipan
             let rekapSaldo = {};
             saldoList.forEach(s => rekapSaldo[s] = { awal: saldoAwalData[s] || 0, masuk: 0, keluar: 0 });
 
@@ -766,7 +803,6 @@
 
             const saldoRiilMilikSaya = sumTotalKotor - totalTitipanOrang;
 
-            // Footer Rekap Saldo
             document.getElementById('sAwalTotal').innerText = formatRp(sumAwal);
             document.getElementById('sMasukTotal').innerText = formatRp(sumMasuk);
             document.getElementById('sKeluarTotal').innerText = formatRp(sumKeluar);
@@ -774,7 +810,6 @@
             document.getElementById('sPotonganTitipan').innerText = '-' + formatRp(totalTitipanOrang);
             document.getElementById('sSaldoRiilSaya').innerText = formatRp(saldoRiilMilikSaya);
 
-            // Populate Ringkasan Kartu Atas
             document.getElementById('topProfitHariIni').innerText = formatRp(hI_Profit);
             document.getElementById('topPengeluaranHariIni').innerText = formatRp(hI_Pengeluaran);
             document.getElementById('topTotalSaldoRiil').innerText = formatRp(saldoRiilMilikSaya);
@@ -783,6 +818,7 @@
         initDropdowns();
         initSaldoGrid();
         renderTables();
+        loadCloudData();
     </script>
 </body>
 </html>
