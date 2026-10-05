@@ -71,7 +71,7 @@
         .btn-lunas { background-color: #16A34A; color: #FFF; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background-color: #64748B; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 6px; display: none; }
 
-        /* Filter Tanggal Baru (Ringkas) */
+        /* Filter Tanggal Ringkas */
         .filter-container { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .filter-btn { padding: 6px 12px; border: 1px solid #CBD5E1; background: #F1F5F9; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .filter-btn.active { background: #2563EB; color: white; border-color: #2563EB; }
@@ -134,7 +134,7 @@
         </div>
     </div>
 
-    <!-- NAVIGATION TABS (6 TAB) -->
+    <!-- NAVIGATION TABS -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab(event, 'tab-harian')">📝 TRANSAKSI</button>
         <button class="tab-btn" onclick="switchTab(event, 'tab-jurnal')">📖 JURNAL TRANSAKSI</button>
@@ -144,7 +144,7 @@
         <button class="tab-btn" onclick="switchTab(event, 'tab-piutang')">🤝 PIUTANG / UTANG</button>
     </div>
 
-    <!-- TAB 1: TRANSAKSI (FORM INPUT SAJA) -->
+    <!-- TAB 1: TRANSAKSI -->
     <div id="tab-harian" class="tab-content active">
         <!-- FITUR 1: PINDAH SALDO (MUTASI) -->
         <div class="card">
@@ -329,6 +329,14 @@
     <div id="tab-pembukuan" class="tab-content">
         <div class="card">
             <div class="card-header">Rekap Transaksi Pembukuan</div>
+
+            <!-- Single Date Picker Filter Untuk Pembukuan -->
+            <div class="filter-container">
+                <span style="font-size:11px; font-weight:700; color:#475569;">Filter Tanggal:</span>
+                <button id="btnFilterAllPembukuan" class="filter-btn active" onclick="resetFilterDatePembukuan()">SEMUA</button>
+                <input type="date" id="datePickerFilterPembukuan" class="date-picker-input" onchange="filterPembukuanByDatePicker(this.value)">
+            </div>
+
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
@@ -468,6 +476,7 @@
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPtfv5DAAKgzH_FVxrKX5Cg43fTSiiyRDKK2sGschbi26npMmu03wIQAVwSHPmpzgpag/exec";
 
         let selectedDateFilter = 'ALL';
+        let selectedDateFilterPembukuan = 'ALL';
 
         const formatRp = (num) => {
             if (num === null || num === undefined || isNaN(num)) return '-';
@@ -520,7 +529,8 @@
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
-        const kategoriList = ['MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'MUTASI SALDO', 'PIUTANG', 'LAIN LAIN', 'CUAN KONTER'];
+        // Kategori diubah: MUTASI SALDO diganti menjadi BELANJA
+        const kategoriList = ['MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'BELANJA', 'PIUTANG', 'LAIN LAIN', 'CUAN KONTER'];
         const saldoList = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'ZEN 1', 'ZEN 2', 'BRANKAS', 'PIUTANG', 'REALISASI ZEN 3', 'ACC NEW', 'VOUCHER', 'SP', 'DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
         const akunBukanMilikSaya = ['DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
 
@@ -548,6 +558,8 @@
                 if (data.transaksi) {
                     transaksiJurnal = data.transaksi.map(t => ({
                         ...t,
+                        // migrasi otomatis data lama jenis MUTASI SALDO jika ada
+                        jenis: t.jenis === 'MUTASI SALDO' ? 'BELANJA' : t.jenis,
                         isoDate: extractIsoDate(t.isoDate, t.waktu)
                     }));
                 } else {
@@ -573,7 +585,12 @@
             fetch(GOOGLE_SCRIPT_URL)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.transaksi) transaksiJurnal = data.transaksi;
+                    if (data.transaksi) {
+                        transaksiJurnal = data.transaksi.map(t => ({
+                            ...t,
+                            jenis: t.jenis === 'MUTASI SALDO' ? 'BELANJA' : t.jenis
+                        }));
+                    }
                     if (data.piutang) piutangData = data.piutang || [];
                     if (data.saldoAwal) saldoAwalData = Object.assign({}, defaultSaldoAwal, data.saldoAwal);
                     if (data.vlookup) vlookupMaster = Object.assign({}, defaultMaster, data.vlookup);
@@ -632,13 +649,13 @@
             });
         }
 
-        // --- FILTER TANGGAL BARU (SINGLE DATE PICKER) ---
+        // --- FILTER TANGGAL JURNAL ---
         window.filterJurnalByDatePicker = function(val) {
             if (!val) {
                 resetFilterDate();
                 return;
             }
-            selectedDateFilter = val; // ISO YYYY-MM-DD
+            selectedDateFilter = val;
             document.getElementById('btnFilterAll').classList.remove('active');
             renderJurnalTable();
         };
@@ -648,6 +665,24 @@
             document.getElementById('datePickerFilter').value = '';
             document.getElementById('btnFilterAll').classList.add('active');
             renderJurnalTable();
+        };
+
+        // --- FILTER TANGGAL PEMBUKUAN ---
+        window.filterPembukuanByDatePicker = function(val) {
+            if (!val) {
+                resetFilterDatePembukuan();
+                return;
+            }
+            selectedDateFilterPembukuan = val;
+            document.getElementById('btnFilterAllPembukuan').classList.remove('active');
+            renderPembukuanTable();
+        };
+
+        window.resetFilterDatePembukuan = function() {
+            selectedDateFilterPembukuan = 'ALL';
+            document.getElementById('datePickerFilterPembukuan').value = '';
+            document.getElementById('btnFilterAllPembukuan').classList.add('active');
+            renderPembukuanTable();
         };
 
         function initSaldoGrid() {
@@ -702,7 +737,7 @@
                 waktu: waktuStr,
                 isoDate: isoDateStr,
                 keterangan: `[MUTASI] Pindah ke ${ke}${noteText}`,
-                jenis: 'MUTASI SALDO',
+                jenis: 'BELANJA',
                 jenisKas: 'KELUAR',
                 akun: dari,
                 nominal: nom
@@ -713,7 +748,7 @@
                 waktu: waktuStr,
                 isoDate: isoDateStr,
                 keterangan: `[MUTASI] Terima dari ${dari}${noteText}`,
-                jenis: 'MUTASI SALDO',
+                jenis: 'BELANJA',
                 jenisKas: 'MASUK',
                 akun: ke,
                 nominal: nom
@@ -953,7 +988,6 @@
 
             let filteredList = transaksiJurnal.map((t, idx) => ({ ...t, originalIndex: idx }));
 
-            // Terapkan Filter Tanggal tunggal
             if (selectedDateFilter !== 'ALL') {
                 filteredList = filteredList.filter(t => {
                     const iso = extractIsoDate(t.isoDate, t.waktu);
@@ -989,8 +1023,51 @@
             }).join('');
         }
 
+        function renderPembukuanTable() {
+            let rekapKat = {};
+            kategoriList.forEach(k => rekapKat[k] = { jml: 0, debit: 0, kredit: 0 });
+
+            // Filter transaksi berdasarkan tanggal untuk tab pembukuan
+            let listTrxPembukuan = transaksiJurnal;
+            if (selectedDateFilterPembukuan !== 'ALL') {
+                listTrxPembukuan = transaksiJurnal.filter(t => {
+                    const iso = extractIsoDate(t.isoDate, t.waktu);
+                    return iso === selectedDateFilterPembukuan;
+                });
+            }
+
+            listTrxPembukuan.forEach(t => {
+                const catName = t.jenis === 'MUTASI SALDO' ? 'BELANJA' : t.jenis;
+                if (rekapKat[catName]) {
+                    rekapKat[catName].jml += 1;
+                    if (t.jenisKas === 'KELUAR') {
+                        rekapKat[catName].debit += Number(t.nominal);
+                    } else {
+                        rekapKat[catName].kredit += Number(t.nominal);
+                    }
+                }
+            });
+
+            const bPembukuan = document.getElementById('bodyPembukuan');
+            bPembukuan.innerHTML = kategoriList.map(k => {
+                const item = rekapKat[k];
+                const total = item.kredit - item.debit;
+                const isCuan = k === 'CUAN KONTER';
+                return `
+                    <tr class="${isCuan ? 'highlight-cyan' : ''}">
+                        <td style="text-align:left;"><b>${k}</b></td>
+                        <td style="text-align:center;">${item.jml}</td>
+                        <td class="text-debit">${formatRp(item.debit)}</td>
+                        <td class="text-kredit">${formatRp(item.kredit)}</td>
+                        <td><b>${formatRp(total)}</b></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         function renderTables() {
             renderJurnalTable();
+            renderPembukuanTable();
 
             // RENDER TABEL PIUTANG
             const bPiutang = document.getElementById('bodyPiutang');
@@ -1039,7 +1116,7 @@
                 const cleanIso = extractIsoDate(t.isoDate, t.waktu);
                 if (cleanIso === todayIso) {
                     if (t.jenis === 'CUAN KONTER') hI_Profit += Number(t.nominal);
-                    if (t.jenisKas === 'KELUAR' && t.jenis !== 'MUTASI SALDO') hI_Pengeluaran += Number(t.nominal);
+                    if (t.jenisKas === 'KELUAR' && t.jenis !== 'BELANJA') hI_Pengeluaran += Number(t.nominal);
                 }
             });
 
@@ -1054,7 +1131,7 @@
 
                 transaksiJurnal.forEach(t => {
                     const cleanIso = extractIsoDate(t.isoDate, t.waktu);
-                    if (cleanIso === isoStr && t.jenis !== 'MUTASI SALDO') {
+                    if (cleanIso === isoStr) {
                         if (t.jenisKas === 'MASUK') totalMasuk += Number(t.nominal);
                         if (t.jenisKas === 'KELUAR') totalKeluar += Number(t.nominal);
                     }
@@ -1083,37 +1160,6 @@
             const totBersihEl = document.getElementById('totBersihHarian');
             totBersihEl.innerText = formatRp(grandBersih);
             totBersihEl.className = (grandBersih >= 0 ? 'text-kredit' : 'text-debit');
-
-            // RENDER PEMBUKUAN
-            let rekapKat = {};
-            kategoriList.forEach(k => rekapKat[k] = { jml: 0, debit: 0, kredit: 0 });
-
-            transaksiJurnal.forEach(t => {
-                if (rekapKat[t.jenis]) {
-                    rekapKat[t.jenis].jml += 1;
-                    if (t.jenisKas === 'KELUAR') {
-                        rekapKat[t.jenis].debit += Number(t.nominal);
-                    } else {
-                        rekapKat[t.jenis].kredit += Number(t.nominal);
-                    }
-                }
-            });
-
-            const bPembukuan = document.getElementById('bodyPembukuan');
-            bPembukuan.innerHTML = kategoriList.map(k => {
-                const item = rekapKat[k];
-                const total = item.kredit - item.debit;
-                const isCuan = k === 'CUAN KONTER';
-                return `
-                    <tr class="${isCuan ? 'highlight-cyan' : ''}">
-                        <td style="text-align:left;"><b>${k}</b></td>
-                        <td style="text-align:center;">${item.jml}</td>
-                        <td class="text-debit">${formatRp(item.debit)}</td>
-                        <td class="text-kredit">${formatRp(item.kredit)}</td>
-                        <td><b>${formatRp(total)}</b></td>
-                    </tr>
-                `;
-            }).join('');
 
             // RENDER REKAP SALDO
             let rekapSaldo = {};
