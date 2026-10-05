@@ -99,10 +99,10 @@
 
     <header>
         <h1>📖 Keuangan & Saldo Pribadi</h1>
-        <p>Aplikasi Catatan Transaksi Harian</p>
+        <p>Aplikasi Catatan Transaksi Harian (Realtime Firebase)</p>
     </header>
 
-    <div id="cloudStatus">🔄 Menghubungkan & mengambil data dari Google Cloud...</div>
+    <div id="cloudStatus">⚡ Menghubungkan ke Firebase Realtime Database...</div>
 
     <div class="top-summary-grid">
         <div class="top-summary-card">
@@ -334,7 +334,27 @@
         </div>
     </div>
 
-    <script>
+    <!-- FIREBASE SDK V9 -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
+        // FIREBASE CONFIG LENGKAP BERSAMA MEASUREMENT ID
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcOeS1jvbHdT1SRI8CKZwFQx7ZDNXp12c",
+            authDomain: "keuangan-pribadi-e713a.firebaseapp.com",
+            databaseURL: "https://keuangan-pribadi-e713a-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "keuangan-pribadi-e713a",
+            storageBucket: "keuangan-pribadi-e713a.firebasestorage.app",
+            messagingSenderId: "333606490804",
+            appId: "1:333606490804:web:4733a1401932a206edbde1",
+            measurementId: "G-QJMNNPPMD1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // GOOGLE SCRIPT URL UNTUK BACKUP OTOMATIS KE GOOGLE SHEETS
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPtfv5DAAKgzH_FVxrKX5Cg43fTSiiyRDKK2sGschbi26npMmu03wIQAVwSHPmpzgpag/exec";
 
         const formatRp = (num) => {
@@ -343,7 +363,7 @@
             return 'Rp' + Number(num).toLocaleString('id-ID');
         };
 
-        function formatNominalInput(el) {
+        window.formatNominalInput = function(el) {
             let val = el.value.replace(/\D/g, '');
             if (val === '') {
                 el.value = '';
@@ -352,7 +372,7 @@
             }
             document.getElementById('nominal').value = val;
             el.value = Number(val).toLocaleString('id-ID');
-        }
+        };
 
         function extractIsoDate(str, waktuStr) {
             if (str && typeof str === 'string') {
@@ -362,32 +382,23 @@
             }
             if (waktuStr && typeof waktuStr === 'string') {
                 const parts = waktuStr.split(',');
-                if (parts.length > 1) {
-                    const dateParts = parts[1].trim().split(' ')[0].split('/');
-                    if (dateParts.length === 3) {
-                        let y = dateParts[2].trim();
-                        if (y.length === 2) y = '20' + y;
-                        let m = dateParts[1].trim().padStart(2, '0');
-                        let d = dateParts[0].trim().padStart(2, '0');
-                        return `${y}-${m}-${d}`;
-                    }
+                const datePartStr = parts.length > 1 ? parts[1].trim() : parts[0].trim();
+                const firstToken = datePartStr.split(' ')[0];
+                const dParts = firstToken.split('/');
+                if (dParts.length === 3) {
+                    let d = dParts[0].trim().padStart(2, '0');
+                    let m = dParts[1].trim().padStart(2, '0');
+                    let y = dParts[2].trim();
+                    if (y.length === 2) y = '20' + y;
+                    return `${y}-${m}-${d}`;
                 }
             }
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
-        const kategoriList = [
-            'MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 
-            'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'LAIN LAIN', 'CUAN KONTER'
-        ];
-
-        const saldoList = [
-            'TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'ZEN 1', 'ZEN 2', 
-            'BRANKAS', 'PIUTANG', 'REALISASI ZEN 3', 'ACC NEW', 'VOUCHER', 'SP',
-            'DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'
-        ];
-
+        const kategoriList = ['MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'LAIN LAIN', 'CUAN KONTER'];
+        const saldoList = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'ZEN 1', 'ZEN 2', 'BRANKAS', 'PIUTANG', 'REALISASI ZEN 3', 'ACC NEW', 'VOUCHER', 'SP', 'DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
         const akunBukanMilikSaya = ['DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
 
         let defaultMaster = {
@@ -398,66 +409,71 @@
             'BELANJA KONTER': { kat: 'BELANJA KONTER', kas: 'KELUAR', akun: 'SEABANK' }
         };
 
-        let vlookupMaster = JSON.parse(localStorage.getItem('vlookupMaster')) || defaultMaster;
-        let transaksiJurnal = JSON.parse(localStorage.getItem('transaksiJurnal')) || [];
-
         let defaultSaldoAwal = {};
         saldoList.forEach(s => defaultSaldoAwal[s] = 0);
-        let saldoAwalData = JSON.parse(localStorage.getItem('saldoAwalData')) || defaultSaldoAwal;
 
-        function loadCloudData() {
-            const statusEl = document.getElementById('cloudStatus');
-            statusEl.style.display = 'block';
-            statusEl.innerText = '🔄 Sinkronisasi data dari Cloud...';
+        let vlookupMaster = defaultMaster;
+        let transaksiJurnal = [];
+        let saldoAwalData = defaultSaldoAwal;
 
-            fetch(GOOGLE_SCRIPT_URL + '?t=' + new Date().getTime())
+        // --- LISTEN SINKRONISASI REALTIME FIREBASE ---
+        const statusEl = document.getElementById('cloudStatus');
+
+        onValue(ref(db, 'keuanganData'), (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                if (data.transaksi) {
+                    transaksiJurnal = data.transaksi.map(t => ({
+                        ...t,
+                        isoDate: extractIsoDate(t.isoDate, t.waktu)
+                    }));
+                } else {
+                    transaksiJurnal = [];
+                }
+                if (data.saldoAwal) saldoAwalData = Object.assign({}, defaultSaldoAwal, data.saldoAwal);
+                if (data.vlookup) vlookupMaster = Object.assign({}, defaultMaster, data.vlookup);
+
+                statusEl.style.background = '#DCFCE7';
+                statusEl.style.color = '#15803D';
+                statusEl.innerText = '⚡ Terhubung Realtime (Instan Sync Active)';
+                
+                initDropdowns();
+                initSaldoGrid();
+                renderTables();
+            } else {
+                syncFromSheets();
+            }
+        });
+
+        function syncFromSheets() {
+            fetch(GOOGLE_SCRIPT_URL)
                 .then(res => res.json())
                 .then(data => {
-                    if (data.transaksi && Array.isArray(data.transaksi)) {
-                        transaksiJurnal = data.transaksi.map(t => {
-                            const cleanIso = extractIsoDate(t.isoDate, t.waktu);
-                            return { ...t, isoDate: cleanIso };
-                        });
-                        localStorage.setItem('transaksiJurnal', JSON.stringify(transaksiJurnal));
-                    }
-                    if (data.saldoAwal && Object.keys(data.saldoAwal).length > 0) {
-                        saldoAwalData = Object.assign({}, defaultSaldoAwal, data.saldoAwal);
-                        localStorage.setItem('saldoAwalData', JSON.stringify(saldoAwalData));
-                    }
-                    if (data.vlookup && Object.keys(data.vlookup).length > 0) {
-                        vlookupMaster = Object.assign({}, defaultMaster, data.vlookup);
-                        localStorage.setItem('vlookupMaster', JSON.stringify(vlookupMaster));
-                    }
-                    statusEl.style.background = '#DCFCE7';
-                    statusEl.style.color = '#15803D';
-                    statusEl.innerText = '✅ Data Berhasil Disinkronkan dengan Cloud!';
-                    setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
-
-                    initDropdowns();
-                    initSaldoGrid();
-                    renderTables();
-                })
-                .catch(err => {
-                    statusEl.style.background = '#FEE2E2';
-                    statusEl.style.color = '#B91C1C';
-                    statusEl.innerText = '⚠️ Gunakan Mode Offline (Gagal terhubung ke Cloud)';
-                    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+                    if (data.transaksi) transaksiJurnal = data.transaksi;
+                    if (data.saldoAwal) saldoAwalData = Object.assign({}, defaultSaldoAwal, data.saldoAwal);
+                    if (data.vlookup) vlookupMaster = Object.assign({}, defaultMaster, data.vlookup);
+                    saveToFirebase();
                 });
         }
 
-        function switchTab(evt, tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            
-            document.getElementById(tabId).classList.add('active');
-            if (evt && evt.currentTarget) {
-                evt.currentTarget.classList.add('active');
-            }
+        function saveToFirebase() {
+            set(ref(db, 'keuanganData'), {
+                transaksi: transaksiJurnal,
+                saldoAwal: saldoAwalData,
+                vlookup: vlookupMaster
+            });
         }
 
-        function toggleModal(modalId) {
+        window.switchTab = function(evt, tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (evt && evt.currentTarget) evt.currentTarget.classList.add('active');
+        };
+
+        window.toggleModal = function(modalId) {
             document.getElementById(modalId).classList.toggle('active');
-        }
+        };
 
         function initDropdowns() {
             const selKat = document.getElementById('kategori');
@@ -497,31 +513,18 @@
             });
         }
 
-        function simpanSaldoAwal() {
+        window.simpanSaldoAwal = function() {
             saldoList.forEach(s => {
                 const inputEl = document.getElementById(`saldoAwal_${s}`);
-                if (inputEl) {
-                    saldoAwalData[s] = parseFloat(inputEl.value) || 0;
-                }
+                if (inputEl) saldoAwalData[s] = parseFloat(inputEl.value) || 0;
             });
-            localStorage.setItem('saldoAwalData', JSON.stringify(saldoAwalData));
-            
-            fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'updateSaldoAwal', payload: saldoAwalData })
-            });
-
+            saveToFirebase();
             toggleModal('saldoModal');
-            renderTables();
-            alert('Saldo Awal tersimpan & dikirim ke Cloud!');
-        }
+        };
 
         document.getElementById('keterangan').addEventListener('input', function(e) {
             const val = e.target.value.trim().toUpperCase();
             const notice = document.getElementById('vlookupNotice');
-            
             if (vlookupMaster[val]) {
                 const match = vlookupMaster[val];
                 document.getElementById('kategori').value = match.kat;
@@ -541,29 +544,14 @@
             const akun = document.getElementById('v_akun').value;
 
             vlookupMaster[ket] = { kat, kas, akun };
-            localStorage.setItem('vlookupMaster', JSON.stringify(vlookupMaster));
-
-            fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'updateVlookup', payload: vlookupMaster })
-            });
-
+            saveToFirebase();
             document.getElementById('v_ket').value = '';
-            initDropdowns();
             toggleModal('modalVlookup');
-            alert(`Aturan VLOOKUP "${ket}" tersimpan & disinkronkan!`);
         });
 
         document.getElementById('formTrx').addEventListener('submit', function(e) {
             e.preventDefault();
-            
             const editIdx = parseInt(document.getElementById('editIndex').value);
-            const statusEl = document.getElementById('statusMsg');
-            statusEl.style.color = '#2563EB';
-            statusEl.innerText = '⏳ Menyimpan data...';
-
             const ket = document.getElementById('keterangan').value;
             const kat = document.getElementById('kategori').value;
             const jenisKas = document.getElementById('jenisKas').value;
@@ -599,29 +587,20 @@
                 transaksiJurnal.unshift(payload);
             }
 
-            localStorage.setItem('transaksiJurnal', JSON.stringify(transaksiJurnal));
-
+            // BACKUP KE GOOGLE SHEETS
             fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            })
-            .then(() => {
-                statusEl.style.color = '#16A34A';
-                statusEl.innerText = editIdx >= 0 ? '✅ Transaksi berhasil diperbarui!' : '✅ Berhasil disimpan & terkirim ke Google Sheets!';
-                setTimeout(() => { statusEl.innerText = ''; }, 3000);
-            })
-            .catch(err => {
-                statusEl.style.color = '#EF4444';
-                statusEl.innerText = '⚠ Tersimpan Lokal (Gagal ke Cloud)';
             });
 
+            // SIMPAN REALTIME KE FIREBASE
+            saveToFirebase();
             cancelEdit();
-            renderTables();
         });
 
-        function editTrx(index) {
+        window.editTrx = function(index) {
             const t = transaksiJurnal[index];
             if (!t) return;
             document.getElementById('editIndex').value = index;
@@ -629,7 +608,6 @@
             document.getElementById('kategori').value = t.jenis;
             document.getElementById('jenisKas').value = t.jenisKas;
             document.getElementById('sumberSaldo').value = t.akun;
-            
             document.getElementById('nominal').value = t.nominal;
             document.getElementById('nominalDisplay').value = Number(t.nominal).toLocaleString('id-ID');
 
@@ -638,11 +616,10 @@
             document.getElementById('btnSubmitTrx').style.backgroundColor = '#EAB308';
             document.getElementById('btnSubmitTrx').style.color = '#000';
             document.getElementById('btnCancelEdit').style.display = 'block';
-
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        };
 
-        function cancelEdit() {
+        window.cancelEdit = function() {
             document.getElementById('editIndex').value = '-1';
             document.getElementById('formTrx').reset();
             document.getElementById('nominal').value = '0';
@@ -653,15 +630,14 @@
             document.getElementById('btnSubmitTrx').style.color = '#FFF';
             document.getElementById('btnCancelEdit').style.display = 'none';
             document.getElementById('vlookupNotice').style.display = 'none';
-        }
+        };
 
-        function deleteTrx(index) {
+        window.deleteTrx = function(index) {
             if (transaksiJurnal[index] && confirm(`Yakin ingin menghapus transaksi "${transaksiJurnal[index].keterangan}"?`)) {
                 transaksiJurnal.splice(index, 1);
-                localStorage.setItem('transaksiJurnal', JSON.stringify(transaksiJurnal));
-                renderTables();
+                saveToFirebase();
             }
-        }
+        };
 
         function renderTables() {
             const bJurnal = document.getElementById('bodyJurnal');
@@ -701,10 +677,17 @@
 
             let grandPemasukan = 0;
             let grandPengeluaran = 0;
-
             let hI_Profit = 0;
             let hI_Pengeluaran = 0;
             const todayIso = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(skrg.getDate()).padStart(2, '0')}`;
+
+            transaksiJurnal.forEach(t => {
+                const cleanIso = extractIsoDate(t.isoDate, t.waktu);
+                if (cleanIso === todayIso) {
+                    if (t.jenis === 'CUAN KONTER') hI_Profit += Number(t.nominal);
+                    if (t.jenisKas === 'KELUAR') hI_Pengeluaran += Number(t.nominal);
+                }
+            });
 
             for (let d = 1; d <= jumlahHari; d++) {
                 const tglObj = new Date(tahun, bulan, d);
@@ -727,11 +710,6 @@
                 grandPemasukan += totalMasuk;
                 grandPengeluaran += totalKeluar;
 
-                if (isoStr === todayIso) {
-                    hI_Profit = bersih;
-                    hI_Pengeluaran = totalKeluar;
-                }
-
                 const hasData = (totalMasuk > 0 || totalKeluar > 0);
                 const classBersih = bersih > 0 ? 'text-kredit' : (bersih < 0 ? 'text-debit' : 'text-muted');
 
@@ -746,7 +724,6 @@
             }
 
             const grandBersih = grandPemasukan - grandPengeluaran;
-            
             document.getElementById('totPemasukanHarian').innerText = formatRp(grandPemasukan);
             document.getElementById('totPengeluaranHarian').innerText = formatRp(grandPengeluaran);
             const totBersihEl = document.getElementById('totBersihHarian');
@@ -809,10 +786,7 @@
                 sumKeluar += item.keluar;
                 sumTotalKotor += total;
 
-                if (akunBukanMilikSaya.includes(s)) {
-                    totalTitipanOrang += total;
-                }
-
+                if (akunBukanMilikSaya.includes(s)) totalTitipanOrang += total;
                 const isTitipan = akunBukanMilikSaya.includes(s);
 
                 return `
@@ -827,7 +801,6 @@
             }).join('');
 
             const saldoRiilMilikSaya = sumTotalKotor - totalTitipanOrang;
-
             document.getElementById('sAwalTotal').innerText = formatRp(sumAwal);
             document.getElementById('sMasukTotal').innerText = formatRp(sumMasuk);
             document.getElementById('sKeluarTotal').innerText = formatRp(sumKeluar);
@@ -839,11 +812,6 @@
             document.getElementById('topPengeluaranHariIni').innerText = formatRp(hI_Pengeluaran);
             document.getElementById('topTotalSaldoRiil').innerText = formatRp(saldoRiilMilikSaya);
         }
-
-        initDropdowns();
-        initSaldoGrid();
-        renderTables();
-        loadCloudData();
     </script>
 </body>
 </html>
