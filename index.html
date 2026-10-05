@@ -335,7 +335,6 @@
     </div>
 
     <script>
-        // URL WEB APP APPS SCRIPT BARU
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwPtfv5DAAKgzH_FVxrKX5Cg43fTSiiyRDKK2sGschbi26npMmu03wIQAVwSHPmpzgpag/exec";
 
         const formatRp = (num) => {
@@ -353,6 +352,29 @@
             }
             document.getElementById('nominal').value = val;
             el.value = Number(val).toLocaleString('id-ID');
+        }
+
+        function extractIsoDate(str, waktuStr) {
+            if (str && typeof str === 'string') {
+                if (str.includes('T')) str = str.split('T')[0];
+                const match = str.match(/\d{4}-\d{2}-\d{2}/);
+                if (match) return match[0];
+            }
+            if (waktuStr && typeof waktuStr === 'string') {
+                const parts = waktuStr.split(',');
+                if (parts.length > 1) {
+                    const dateParts = parts[1].trim().split(' ')[0].split('/');
+                    if (dateParts.length === 3) {
+                        let y = dateParts[2].trim();
+                        if (y.length === 2) y = '20' + y;
+                        let m = dateParts[1].trim().padStart(2, '0');
+                        let d = dateParts[0].trim().padStart(2, '0');
+                        return `${y}-${m}-${d}`;
+                    }
+                }
+            }
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }
 
         const kategoriList = [
@@ -388,11 +410,14 @@
             statusEl.style.display = 'block';
             statusEl.innerText = '🔄 Sinkronisasi data dari Cloud...';
 
-            fetch(GOOGLE_SCRIPT_URL)
+            fetch(GOOGLE_SCRIPT_URL + '?t=' + new Date().getTime())
                 .then(res => res.json())
                 .then(data => {
-                    if (data.transaksi && data.transaksi.length > 0) {
-                        transaksiJurnal = data.transaksi;
+                    if (data.transaksi && Array.isArray(data.transaksi)) {
+                        transaksiJurnal = data.transaksi.map(t => {
+                            const cleanIso = extractIsoDate(t.isoDate, t.waktu);
+                            return { ...t, isoDate: cleanIso };
+                        });
                         localStorage.setItem('transaksiJurnal', JSON.stringify(transaksiJurnal));
                     }
                     if (data.saldoAwal && Object.keys(data.saldoAwal).length > 0) {
@@ -550,11 +575,11 @@
 
             if (editIdx >= 0 && transaksiJurnal[editIdx]) {
                 waktuStr = transaksiJurnal[editIdx].waktu;
-                isoDateStr = transaksiJurnal[editIdx].isoDate || skrg.toISOString().split('T')[0];
+                isoDateStr = extractIsoDate(transaksiJurnal[editIdx].isoDate, waktuStr);
             } else {
                 const opsiTgl = { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' };
                 waktuStr = skrg.toLocaleDateString('id-ID', opsiTgl);
-                isoDateStr = skrg.toISOString().split('T')[0];
+                isoDateStr = `${skrg.getFullYear()}-${String(skrg.getMonth() + 1).padStart(2, '0')}-${String(skrg.getDate()).padStart(2, '0')}`;
             }
 
             const payload = {
@@ -589,7 +614,7 @@
             })
             .catch(err => {
                 statusEl.style.color = '#EF4444';
-                statusEl.innerText = '⚠️️ Tersimpan Lokal (Gagal ke Cloud)';
+                statusEl.innerText = '⚠ Tersimpan Lokal (Gagal ke Cloud)';
             });
 
             cancelEdit();
@@ -679,7 +704,7 @@
 
             let hI_Profit = 0;
             let hI_Pengeluaran = 0;
-            const todayIso = skrg.toISOString().split('T')[0];
+            const todayIso = `${tahun}-${String(bulan + 1).padStart(2, '0')}-${String(skrg.getDate()).padStart(2, '0')}`;
 
             for (let d = 1; d <= jumlahHari; d++) {
                 const tglObj = new Date(tahun, bulan, d);
@@ -691,10 +716,10 @@
                 let totalKeluar = 0;
 
                 transaksiJurnal.forEach(t => {
-                    const tglTrxIso = t.isoDate || '';
-                    if (tglTrxIso === isoStr) {
-                        if (t.jenisKas === 'MASUK') totalMasuk += t.nominal;
-                        if (t.jenisKas === 'KELUAR') totalKeluar += t.nominal;
+                    const cleanIso = extractIsoDate(t.isoDate, t.waktu);
+                    if (cleanIso === isoStr) {
+                        if (t.jenisKas === 'MASUK') totalMasuk += Number(t.nominal);
+                        if (t.jenisKas === 'KELUAR') totalKeluar += Number(t.nominal);
                     }
                 });
 
@@ -735,9 +760,9 @@
                 if (rekapKat[t.jenis]) {
                     rekapKat[t.jenis].jml += 1;
                     if (t.jenisKas === 'KELUAR') {
-                        rekapKat[t.jenis].debit += t.nominal;
+                        rekapKat[t.jenis].debit += Number(t.nominal);
                     } else {
-                        rekapKat[t.jenis].kredit += t.nominal;
+                        rekapKat[t.jenis].kredit += Number(t.nominal);
                     }
                 }
             });
@@ -764,9 +789,9 @@
             transaksiJurnal.forEach(t => {
                 if (rekapSaldo[t.akun]) {
                     if (t.jenisKas === 'KELUAR') {
-                        rekapSaldo[t.akun].keluar += t.nominal;
+                        rekapSaldo[t.akun].keluar += Number(t.nominal);
                     } else {
-                        rekapSaldo[t.akun].masuk += t.nominal;
+                        rekapSaldo[t.akun].masuk += Number(t.nominal);
                     }
                 }
             });
