@@ -11,6 +11,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
+    <!-- SheetJS for Export Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <style>
         :root {
             --primary: #1E293B;
@@ -30,9 +33,34 @@
         * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg); color: var(--text); padding: 8px; max-width: 720px; margin: 0 auto; padding-bottom: 80px; }
 
-        header { background-color: var(--primary); color: white; padding: 12px; border-radius: 12px; margin-bottom: 10px; text-align: center; }
-        header h1 { font-size: 16px; font-weight: 700; color: #FACC15; }
-        header p { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+        header { 
+            background-color: var(--primary); 
+            color: white; 
+            padding: 12px; 
+            border-radius: 12px; 
+            margin-bottom: 10px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header .header-title h1 { font-size: 16px; font-weight: 700; color: #FACC15; }
+        header .header-title p { font-size: 10px; opacity: 0.8; margin-top: 2px; }
+        
+        .btn-mgmt {
+            background-color: #334155;
+            color: #F8FAFC;
+            border: 1px solid #475569;
+            padding: 6px 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: 0.2s;
+        }
+        .btn-mgmt:active { background-color: #475569; }
 
         .top-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
         .top-summary-card { 
@@ -116,6 +144,37 @@
         #statusMsg { font-size: 10px; font-weight: bold; text-align: center; margin-top: 4px; }
         #cloudStatus { font-size: 9.5px; text-align: center; padding: 4px; background: #E0F2FE; color: #0369A1; border-radius: 6px; margin-bottom: 8px; }
 
+        /* MODAL DIALOG / OVERLAY */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content-popup {
+            background: #FFFFFF;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 450px;
+            padding: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .modal-header-popup {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-header-popup h3 { font-size: 14px; color: var(--text); font-weight: 700; }
+        .btn-close-popup { background: none; border: none; font-size: 18px; font-weight: bold; cursor: pointer; color: #64748B; }
+
         /* FLOATING ACTION BUTTON (FAB) */
         .fab-button {
             position: fixed;
@@ -146,8 +205,11 @@
 <body>
 
     <header>
-        <h1>📖 Keuangan & Saldo Pribadi</h1>
-        <p>Aplikasi Catatan Transaksi Harian (Realtime Firebase)</p>
+        <div class="header-title">
+            <h1>📖 Keuangan & Saldo Pribadi</h1>
+            <p>Aplikasi Catatan Transaksi Harian (Realtime Firebase)</p>
+        </div>
+        <button class="btn-mgmt" onclick="openManagementModal()">⚙️ Data</button>
     </header>
 
     <div id="cloudStatus">⚡ Menghubungkan ke Firebase...</div>
@@ -488,6 +550,31 @@
         </div>
     </div>
 
+    <!-- MODAL MANAGEMENT DATA -->
+    <div id="mgmtDataModal" class="modal-overlay">
+        <div class="modal-content-popup">
+            <div class="modal-header-popup">
+                <h3>⚙️ Management Data</h3>
+                <button class="btn-close-popup" onclick="closeManagementModal()">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn" style="background-color: #0284C7;" onclick="exportToExcel()">
+                    📊 Download Rekap Excel (.xlsx)
+                </button>
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 2px 0;">
+                <button class="btn" style="background-color: #16A34A;" onclick="backupJSON()">
+                    💾 Backup Data (JSON)
+                </button>
+                <div>
+                    <label style="font-size: 10.5px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">
+                        📥 Restore Data dari JSON:
+                    </label>
+                    <input type="file" id="restoreFileInput" accept=".json" class="form-control" onchange="restoreJSON(event)">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- FLOATING ACTION BUTTON (FAB) -->
     <button class="fab-button" onclick="quickAddTransaction()" title="Input Transaksi Baru">+</button>
 
@@ -641,6 +728,144 @@
                 vlookup: vlookupMaster
             });
         }
+
+        // MANAGEMENT DATA MODAL
+        window.openManagementModal = function() {
+            document.getElementById('mgmtDataModal').classList.add('active');
+        };
+        window.closeManagementModal = function() {
+            document.getElementById('mgmtDataModal').classList.remove('active');
+            document.getElementById('restoreFileInput').value = '';
+        };
+
+        // BACKUP JSON
+        window.backupJSON = function() {
+            const backupData = {
+                transaksi: transaksiJurnal,
+                piutang: piutangData,
+                saldoAwal: saldoAwalData,
+                vlookup: vlookupMaster,
+                backupAt: new Date().toISOString()
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const dateObj = new Date();
+            const dateStr = `${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, '0')}${String(dateObj.getDate()).padStart(2, '0')}`;
+            
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `Backup_Keuangan_ZENCELL_${dateStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        };
+
+        // RESTORE JSON
+        window.restoreJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (!importedData.transaksi && !importedData.saldoAwal) {
+                        alert("Format JSON tidak valid atau bukan backup aplikasi!");
+                        return;
+                    }
+                    if (confirm("Apakah Anda yakin ingin memulihkan/restore data ini? Data saat ini di Firebase akan diperbarui.")) {
+                        if (importedData.transaksi) transaksiJurnal = importedData.transaksi;
+                        if (importedData.piutang) piutangData = importedData.piutang;
+                        if (importedData.saldoAwal) saldoAwalData = importedData.saldoAwal;
+                        if (importedData.vlookup) vlookupMaster = importedData.vlookup;
+                        
+                        saveToFirebase();
+                        alert("Data berhasil dipulihkan dari backup!");
+                        closeManagementModal();
+                    }
+                } catch (err) {
+                    alert("Gagal membaca file JSON: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // REKAP EXCEL
+        window.exportToExcel = function() {
+            if (typeof XLSX === 'undefined') {
+                alert("Library Excel belum siap, coba lagi sebentar.");
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+
+            // 1. Sheet Jurnal Transaksi
+            const jurnalData = transaksiJurnal.map((t, idx) => ({
+                "NO": transaksiJurnal.length - idx,
+                "WAKTU": t.waktu,
+                "ISO DATE": t.isoDate,
+                "KETERANGAN": t.keterangan,
+                "KATEGORI": t.jenis,
+                "ARUS KAS": t.jenisKas,
+                "AKUN SALDO": t.akun,
+                "NOMINAL": t.nominal
+            }));
+            const wsJurnal = XLSX.utils.json_to_sheet(jurnalData);
+            XLSX.utils.book_append_sheet(wb, wsJurnal, "Jurnal Transaksi");
+
+            // 2. Sheet Pembukuan Kategori
+            let rekapKat = {};
+            kategoriList.forEach(k => rekapKat[k] = { jml: 0, debit: 0, kredit: 0 });
+            transaksiJurnal.forEach(t => {
+                const catName = t.jenis === 'MUTASI SALDO' ? 'BELANJA' : t.jenis;
+                if (rekapKat[catName]) {
+                    rekapKat[catName].jml += 1;
+                    if (t.jenisKas === 'KELUAR') {
+                        rekapKat[catName].debit += Number(t.nominal);
+                    } else {
+                        rekapKat[catName].kredit += Number(t.nominal);
+                    }
+                }
+            });
+            const pembukuanData = kategoriList.map(k => ({
+                "KATEGORI": k,
+                "JUMLAH TRX": rekapKat[k].jml,
+                "DEBIT (KELUAR)": rekapKat[k].debit,
+                "KREDIT (MASUK)": rekapKat[k].kredit,
+                "TOTAL BERSIH": rekapKat[k].kredit - rekapKat[k].debit
+            }));
+            const wsPembukuan = XLSX.utils.json_to_sheet(pembukuanData);
+            XLSX.utils.book_append_sheet(wb, wsPembukuan, "Rekap Pembukuan");
+
+            // 3. Sheet Rekap Saldo
+            let rekapSaldo = {};
+            saldoList.forEach(s => rekapSaldo[s] = { awal: saldoAwalData[s] || 0, masuk: 0, keluar: 0 });
+            transaksiJurnal.forEach(t => {
+                if (rekapSaldo[t.akun]) {
+                    if (t.jenisKas === 'KELUAR') {
+                        rekapSaldo[t.akun].keluar += Number(t.nominal);
+                    } else {
+                        rekapSaldo[t.akun].masuk += Number(t.nominal);
+                    }
+                }
+            });
+            const saldoData = saldoList.map(s => {
+                const item = rekapSaldo[s];
+                return {
+                    "AKUN SALDO": s,
+                    "SALDO AWAL": item.awal,
+                    "MASUK": item.masuk,
+                    "KELUAR": item.keluar,
+                    "TOTAL SALDO": item.awal + item.masuk - item.keluar
+                };
+            });
+            const wsSaldo = XLSX.utils.json_to_sheet(saldoData);
+            XLSX.utils.book_append_sheet(wb, wsSaldo, "Rekap Saldo");
+
+            // Export ke file .xlsx
+            const dateObj = new Date();
+            const dateStr = `${dateObj.getFullYear()}${String(dateObj.getMonth() + 1).padStart(2, '0')}${String(dateObj.getDate()).padStart(2, '0')}`;
+            XLSX.writeFile(wb, `Rekap_Keuangan_ZENCELL_${dateStr}.xlsx`);
+        };
 
         window.switchTab = function(evt, tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
