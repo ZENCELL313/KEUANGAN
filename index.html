@@ -1454,19 +1454,23 @@
             bSaldo.innerHTML = saldoList.map(s => {
                 const item = rekapSaldo[s];
                 const total = item.awal + item.masuk - item.keluar;
+                const isTitipan = akunBukanMilikSaya.includes(s);
 
-                sumAwal += item.awal;
-                sumMasuk += item.masuk;
-                sumKeluar += item.keluar;
-                sumTotalKotor += total;
+                // Perbaikan Logika: Jika akun merupakan Titipan (Deposito, Bunga Deposito, M Deded), 
+                // saldonya TIDAK dijumlahkan ke sumTotalKotor agar tidak terhitung ganda (karena fisiknya ada di ZEN 1 / ZEN 2).
+                if (!isTitipan) {
+                    sumAwal += item.awal;
+                    sumMasuk += item.masuk;
+                    sumKeluar += item.keluar;
+                    sumTotalKotor += total;
+                }
 
                 if (akunFastMoney.includes(s)) totalFastMoney += total;
-                if (akunBukanMilikSaya.includes(s)) totalTitipanOrang += total;
-                const isTitipan = akunBukanMilikSaya.includes(s);
+                if (isTitipan) totalTitipanOrang += total;
 
                 return `
                     <tr style="${isTitipan ? 'background-color:#FFF1F2;' : ''}">
-                        <td class="col-nama-saldo" style="text-align:left;"><b>${s}</b> ${isTitipan ? '<br><span style="font-size:8px; color:#EF4444;">(Titipan)</span>' : ''}</td>
+                        <td class="col-nama-saldo" style="text-align:left;"><b>${s}</b> ${isTitipan ? '<br><span style="font-size:8px; color:#EF4444;">(Titipan di ZEN)</span>' : ''}</td>
                         <td>${formatRp(item.awal)}</td>
                         <td class="text-kredit">${formatRp(item.masuk)}</td>
                         <td class="text-debit">${formatRp(item.keluar)}</td>
@@ -1475,6 +1479,7 @@
                 `;
             }).join('');
 
+            // Saldo bersih riil adalah total saldo rekening riil dikurangi komponen titipan
             const saldoRiilMilikSaya = sumTotalKotor - totalTitipanOrang;
             document.getElementById('sAwalTotal').innerText = formatRp(sumAwal);
             document.getElementById('sMasukTotal').innerText = formatRp(sumMasuk);
