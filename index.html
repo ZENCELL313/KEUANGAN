@@ -675,6 +675,17 @@
             el.value = Number(val).toLocaleString('id-ID');
         };
 
+        window.formatSaldoAwalInput = function(el, hiddenId) {
+            let val = el.value.replace(/\D/g, '');
+            if (val === '') {
+                el.value = '';
+                document.getElementById(hiddenId).value = '0';
+                return;
+            }
+            document.getElementById(hiddenId).value = val;
+            el.value = Number(val).toLocaleString('id-ID');
+        };
+
         function extractIsoDate(str, waktuStr) {
             if (str && typeof str === 'string') {
                 if (str.includes('T')) str = str.split('T')[0];
@@ -1010,10 +1021,12 @@
             gridSaldo.innerHTML = '';
             saldoList.forEach(s => {
                 const val = saldoAwalData[s] || 0;
+                const formattedVal = val > 0 ? Number(val).toLocaleString('id-ID') : '';
                 gridSaldo.innerHTML += `
                     <div>
                         <label style="font-size:9.5px; font-weight:600;">${s}</label>
-                        <input type="number" id="saldoAwal_${s}" class="form-control" style="padding:4px 6px; font-size:10px;" value="${val}">
+                        <input type="text" id="saldoAwalDisplay_${s}" class="form-control" style="padding:4px 6px; font-size:10px;" value="${formattedVal}" placeholder="0" oninput="formatSaldoAwalInput(this, 'saldoAwal_${s}')">
+                        <input type="hidden" id="saldoAwal_${s}" value="${val}">
                     </div>
                 `;
             });
