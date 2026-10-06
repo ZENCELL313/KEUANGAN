@@ -62,7 +62,7 @@
         }
         .btn-mgmt:active { background-color: #475569; }
 
-        .top-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+        .top-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
         .top-summary-card { 
             background: #FFFFFF; 
             padding: 8px 4px; 
@@ -76,8 +76,8 @@
             justify-content: center;
         }
         .top-summary-card .icon-box { font-size: 14px; margin-bottom: 2px; }
-        .top-summary-card .lbl { font-size: 8.5px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 2px; }
-        .top-summary-card .val { font-size: 11px; font-weight: 800; word-break: break-all; }
+        .top-summary-card .lbl { font-size: 8px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 2px; }
+        .top-summary-card .val { font-size: 10.5px; font-weight: 800; word-break: break-all; }
 
         .nav-tabs { display: flex; gap: 4px; margin-bottom: 10px; background: #E2E8F0; padding: 4px; border-radius: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .nav-tabs::-webkit-scrollbar { display: none; }
@@ -224,6 +224,11 @@
             <div class="icon-box">💸</div>
             <div class="lbl">Pengeluaran</div>
             <div class="val text-debit" id="topPengeluaranHariIni">Rp0</div>
+        </div>
+        <div class="top-summary-card">
+            <div class="icon-box">⚡</div>
+            <div class="lbl">Fast Money</div>
+            <div class="val" id="topFastMoney" style="color:#D97706;">Rp0</div>
         </div>
         <div class="top-summary-card">
             <div class="icon-box">🏦</div>
@@ -655,6 +660,7 @@
 
         const kategoriList = ['MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'BELANJA', 'PIUTANG', 'LAIN LAIN', 'CUAN KONTER'];
         const saldoList = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'ZEN 1', 'ZEN 2', 'BRANKAS', 'PIUTANG', 'REALISASI ZEN 3', 'ACC NEW', 'VOUCHER', 'SP', 'DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
+        const akunFastMoney = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL'];
         const akunBukanMilikSaya = ['DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
 
         let defaultMaster = {
@@ -1442,6 +1448,7 @@
 
             let sumAwal = 0, sumMasuk = 0, sumKeluar = 0, sumTotalKotor = 0;
             let totalTitipanOrang = 0;
+            let totalFastMoney = 0;
 
             const bSaldo = document.getElementById('bodySaldo');
             bSaldo.innerHTML = saldoList.map(s => {
@@ -1453,6 +1460,7 @@
                 sumKeluar += item.keluar;
                 sumTotalKotor += total;
 
+                if (akunFastMoney.includes(s)) totalFastMoney += total;
                 if (akunBukanMilikSaya.includes(s)) totalTitipanOrang += total;
                 const isTitipan = akunBukanMilikSaya.includes(s);
 
@@ -1477,6 +1485,7 @@
 
             document.getElementById('topProfitHariIni').innerText = formatRp(hI_Profit);
             document.getElementById('topPengeluaranHariIni').innerText = formatRp(hI_Pengeluaran);
+            document.getElementById('topFastMoney').innerText = formatRp(totalFastMoney);
             document.getElementById('topTotalSaldoRiil').innerText = formatRp(saldoRiilMilikSaya);
         }
 
