@@ -209,7 +209,7 @@
             <h1>📖 Keuangan & Saldo Pribadi</h1>
             <p>Aplikasi Catatan Transaksi Harian (Realtime Firebase)</p>
         </div>
-        <button class="btn-mgmt" onclick="openManagementModal()">⚙️ Data</button>
+        <button class="btn-mgmt" onclick="openManagementModal()">⚙️️ Data</button>
     </header>
 
     <div id="cloudStatus">⚡ Menghubungkan ke Firebase...</div>
@@ -484,19 +484,11 @@
                     </thead>
                     <tbody id="bodySaldo"></tbody>
                     <tfoot>
-                        <tr class="total-row">
-                            <td style="text-align:left;">TOTAL GABUNGAN</td>
+                        <tr class="total-row-highlight">
+                            <td style="text-align:left; font-weight:800;">SALDO BERSIH SAYA (RIIL)</td>
                             <td id="sAwalTotal">Rp0</td>
                             <td id="sMasukTotal" class="text-kredit">Rp0</td>
                             <td id="sKeluarTotal" class="text-debit">Rp0</td>
-                            <td id="sAkumulasiTotal">Rp0</td>
-                        </tr>
-                        <tr>
-                            <td colspan="4" style="text-align:left; color:#EF4444; font-weight:600;">TITIPAN (DEPOSITO+BUNGA+M DEDED)</td>
-                            <td id="sPotonganTitipan" class="text-debit">-Rp0</td>
-                        </tr>
-                        <tr class="total-row-highlight">
-                            <td colspan="4" style="text-align:left; font-weight:800;">SALDO BERSIH SAYA (RIIL)</td>
                             <td id="sSaldoRiilSaya" style="font-size:11px; font-weight:800; color:#16A34A;">Rp0</td>
                         </tr>
                     </tfoot>
@@ -661,7 +653,6 @@
         const kategoriList = ['MAKANAN', 'JAJAN', 'BELANJA KONTER', 'HIBURAN', 'BENSIN', 'PERAWATAN DIRI', 'CICILAN', 'TAGIHAN', 'BELANJA', 'PIUTANG', 'LAIN LAIN', 'CUAN KONTER'];
         const saldoList = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'ZEN 1', 'ZEN 2', 'BRANKAS', 'PIUTANG', 'REALISASI ZEN 3', 'ACC NEW', 'VOUCHER', 'SP', 'DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
         const akunFastMoney = ['TUNAI', 'SEABANK', 'KROM BANK', 'TAB AKMAL', 'BRANKAS'];
-        const akunBukanMilikSaya = ['DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'];
 
         let defaultMaster = {
             'JAJAN': { kat: 'JAJAN', kas: 'KELUAR', akun: 'TUNAI' },
@@ -1433,6 +1424,9 @@
             totBersihEl.innerText = formatRp(grandBersih);
             totBersihEl.className = (grandBersih >= 0 ? 'text-kredit' : 'text-debit');
 
+            // -------------------------------------------------------------
+            // REKAP SALDO DENGAN LOGIKA PEMASUKAN/PENGELUARAN TERPISAH
+            // -------------------------------------------------------------
             let rekapSaldo = {};
             saldoList.forEach(s => rekapSaldo[s] = { awal: saldoAwalData[s] || 0, masuk: 0, keluar: 0 });
 
@@ -1446,52 +1440,73 @@
                 }
             });
 
-            let sumAwal = 0, sumMasuk = 0, sumKeluar = 0, sumTotalKotor = 0;
-            let totalTitipanOrang = 0;
+            // Hitung nilai akhir murni masing-masing akun dari transaksi
+            let rawSaldo = {};
+            saldoList.forEach(s => {
+                const item = rekapSaldo[s];
+                rawSaldo[s] = item.awal + item.masuk - item.keluar;
+            });
+
+            // POTONGAN DANA TITIPAN
+            const nomDeposito = rawSaldo['DEPOSITO'] || 0;
+            const nomBungaDeposito = rawSaldo['BUNGA DEPOSITO'] || 0;
+            const nomMDeded = rawSaldo['M DEDED'] || 0;
+
+            // BERSIH MURNI SESUAI REQUEST:
+            // 1. Saldo ZEN 1 dikurangi Deposito & Bunga Deposito
+            // 2. Saldo ZEN 2 dikurangi M Deded
+            const displaySaldo = { ...rawSaldo };
+            displaySaldo['ZEN 1'] = rawSaldo['ZEN 1'] - (nomDeposito + nomBungaDeposito);
+            displaySaldo['ZEN 2'] = rawSaldo['ZEN 2'] - nomMDeded;
+
+            let sumAwal = 0, sumMasuk = 0, sumKeluar = 0, sumSaldoRiilMurni = 0;
             let totalFastMoney = 0;
 
             const bSaldo = document.getElementById('bodySaldo');
             bSaldo.innerHTML = saldoList.map(s => {
                 const item = rekapSaldo[s];
-                const total = item.awal + item.masuk - item.keluar;
-                const isTitipan = akunBukanMilikSaya.includes(s);
+                const totalDisplay = displaySaldo[s];
 
-                // Perbaikan Logika: Jika akun merupakan Titipan (Deposito, Bunga Deposito, M Deded), 
-                // saldonya TIDAK dijumlahkan ke sumTotalKotor agar tidak terhitung ganda (karena fisiknya ada di ZEN 1 / ZEN 2).
-                if (!isTitipan) {
+                // Jika akun tersebut adalah Deposito, Bunga Deposito, atau M Deded
+                const isInformasiTitipan = ['DEPOSITO', 'BUNGA DEPOSITO', 'M DEDED'].includes(s);
+
+                // Hitung total akumulasi bersih milik Anda (tanpa menjumlahkan ulang titipan)
+                if (!isInformasiTitipan) {
                     sumAwal += item.awal;
                     sumMasuk += item.masuk;
                     sumKeluar += item.keluar;
-                    sumTotalKotor += total;
+                    sumSaldoRiilMurni += totalDisplay;
                 }
 
-                if (akunFastMoney.includes(s)) totalFastMoney += total;
-                if (isTitipan) totalTitipanOrang += total;
+                if (akunFastMoney.includes(s)) {
+                    totalFastMoney += totalDisplay;
+                }
+
+                let subNote = '';
+                if (s === 'ZEN 1') subNote = '<br><span style="font-size:8px; color:#0284C7;">(Net / Sesudah Deposito&Bunga)</span>';
+                if (s === 'ZEN 2') subNote = '<br><span style="font-size:8px; color:#0284C7;">(Net / Sesudah M Deded)</span>';
+                if (isInformasiTitipan) subNote = '<br><span style="font-size:8px; color:#94A3B8;">(Catatan Titipan)</span>';
 
                 return `
-                    <tr style="${isTitipan ? 'background-color:#FFF1F2;' : ''}">
-                        <td class="col-nama-saldo" style="text-align:left;"><b>${s}</b> ${isTitipan ? '<br><span style="font-size:8px; color:#EF4444;">(Titipan di ZEN)</span>' : ''}</td>
+                    <tr style="${isInformasiTitipan ? 'background-color:#F8FAFC; opacity:0.7;' : ''}">
+                        <td class="col-nama-saldo" style="text-align:left;"><b>${s}</b> ${subNote}</td>
                         <td>${formatRp(item.awal)}</td>
                         <td class="text-kredit">${formatRp(item.masuk)}</td>
                         <td class="text-debit">${formatRp(item.keluar)}</td>
-                        <td><b>${formatRp(total)}</b></td>
+                        <td><b>${formatRp(totalDisplay)}</b></td>
                     </tr>
                 `;
             }).join('');
 
-            // Saldo bersih riil adalah total saldo rekening riil dikurangi komponen titipan
-            const saldoRiilMilikSaya = sumTotalKotor - totalTitipanOrang;
             document.getElementById('sAwalTotal').innerText = formatRp(sumAwal);
             document.getElementById('sMasukTotal').innerText = formatRp(sumMasuk);
             document.getElementById('sKeluarTotal').innerText = formatRp(sumKeluar);
-            document.getElementById('sAkumulasiTotal').innerText = formatRp(sumTotalKotor);
-            document.getElementById('sPotonganTitipan').innerText = '-' + formatRp(totalTitipanOrang);
-            document.getElementById('sSaldoRiilSaya').innerText = formatRp(saldoRiilMilikSaya);
+            document.getElementById('sSaldoRiilSaya').innerText = formatRp(sumSaldoRiilMurni);
 
             document.getElementById('topProfitHariIni').innerText = formatRp(hI_Profit);
             document.getElementById('topPengeluaranHariIni').innerText = formatRp(hI_Pengeluaran);
             document.getElementById('topFastMoney').innerText = formatRp(totalFastMoney);
-            document.getElementById('topTotalSaldoRiil').innerText = formatRp(saldoRiilMilikSaya);
+            document.getElementById('topTotalSaldoRiil').innerText = formatRp(sumSaldoRiilMurni);
         }
 
         // REGISTER DUMMY SERVICE WORKER FOR PWA INSTALLATION
