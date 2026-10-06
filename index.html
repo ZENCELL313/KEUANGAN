@@ -107,6 +107,27 @@
         .btn-lunas { background-color: #16A34A; color: #FFF; border: none; padding: 4px 6px; border-radius: 4px; font-size: 9.5px; font-weight: bold; cursor: pointer; }
         .btn-cancel { background-color: #64748B; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 6px; display: none; }
 
+        /* Style khusus link aplikasi bank */
+        .bank-app-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #2563EB;
+            text-decoration: none;
+            font-weight: 800;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            transition: all 0.2s ease;
+        }
+        .bank-app-link:hover, .bank-app-link:active {
+            background-color: #DBEAFE;
+            color: #1D4ED8;
+            transform: scale(0.98);
+        }
+
         /* Filter Tanggal Ringkas */
         .filter-container { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
         .filter-btn { padding: 5px 10px; border: 1px solid #CBD5E1; background: #F1F5F9; border-radius: 6px; font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }
@@ -209,7 +230,7 @@
             <h1>📖 Keuangan & Saldo Pribadi</h1>
             <p>Aplikasi Catatan Transaksi Harian (Realtime Firebase)</p>
         </div>
-        <button class="btn-mgmt" onclick="openManagementModal()">⚙️️ Data</button>
+        <button class="btn-mgmt" onclick="openManagementModal()">⚙ Data</button>
     </header>
 
     <div id="cloudStatus">⚡ Menghubungkan ke Firebase...</div>
@@ -980,6 +1001,31 @@
             toggleModal('saldoModal');
         };
 
+        // FUNGSI MEMBUKA APLIKASI BANK
+        window.openBankApp = function(bankName) {
+            let appScheme = '';
+            let fallbackUrl = '';
+
+            if (bankName === 'SEABANK') {
+                appScheme = 'seabank://';
+                fallbackUrl = 'https://play.google.com/store/apps/details?id=com.bankseabnk.id';
+            } else if (bankName === 'KROM BANK') {
+                appScheme = 'krom://';
+                fallbackUrl = 'https://play.google.com/store/apps/details?id=id.co.krom.bank';
+            }
+
+            if (!appScheme) return;
+
+            const now = Date.now();
+            window.location.href = appScheme;
+
+            setTimeout(() => {
+                if (Date.now() - now < 2000) {
+                    window.location.href = fallbackUrl;
+                }
+            }, 1200);
+        };
+
         document.getElementById('formPindahSaldo').addEventListener('submit', function(e) {
             e.preventDefault();
             const dari = document.getElementById('pindahDari').value;
@@ -1217,7 +1263,7 @@
             document.getElementById('nominal').value = t.nominal;
             document.getElementById('nominalDisplay').value = Number(t.nominal).toLocaleString('id-ID');
 
-            document.getElementById('formHeader').innerText = '✏️ Edit Transaksi';
+            document.getElementById('formHeader').innerText = '✏️️ Edit Transaksi';
             document.getElementById('btnSubmitTrx').innerText = '💾 Simpan Perubahan';
             document.getElementById('btnSubmitTrx').style.backgroundColor = '#EAB308';
             document.getElementById('btnSubmitTrx').style.color = '#000';
@@ -1487,9 +1533,25 @@
                 if (s === 'ZEN 2') subNote = '<br><span style="font-size:8px; color:#0284C7;">(Net / Sesudah M Deded)</span>';
                 if (isInformasiTitipan) subNote = '<br><span style="font-size:8px; color:#94A3B8;">(Catatan Titipan)</span>';
 
+                // CUSTOM RENDER UNTUK SEABANK & KROM BANK
+                let saldoLabelHtml = `<b>${s}</b>`;
+                if (s === 'SEABANK') {
+                    saldoLabelHtml = `
+                        <a class="bank-app-link" onclick="openBankApp('SEABANK')">
+                            <span>📲</span> <b>SEABANK</b> ↗
+                        </a>
+                    `;
+                } else if (s === 'KROM BANK') {
+                    saldoLabelHtml = `
+                        <a class="bank-app-link" onclick="openBankApp('KROM BANK')">
+                            <span>📲</span> <b>KROM BANK</b> ↗
+                        </a>
+                    `;
+                }
+
                 return `
                     <tr style="${isInformasiTitipan ? 'background-color:#F8FAFC; opacity:0.7;' : ''}">
-                        <td class="col-nama-saldo" style="text-align:left;"><b>${s}</b> ${subNote}</td>
+                        <td class="col-nama-saldo" style="text-align:left;">${saldoLabelHtml} ${subNote}</td>
                         <td>${formatRp(item.awal)}</td>
                         <td class="text-kredit">${formatRp(item.masuk)}</td>
                         <td class="text-debit">${formatRp(item.keluar)}</td>
