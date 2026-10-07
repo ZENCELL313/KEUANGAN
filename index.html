@@ -292,7 +292,7 @@
                     </div>
                     <div class="form-group">
                         <label>Nominal (Rp)</label>
-                        <input type="text" id="pindahNominalDisplay" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="0" required oninput="formatNominalCustom(this, 'pindahNominal')">
+                        <input type="text" id="pindahNominalDisplay" inputmode="numeric" class="form-control" placeholder="0" required oninput="formatNominalCustom(this, 'pindahNominal')">
                         <input type="hidden" id="pindahNominal" value="0">
                     </div>
                     <div class="form-group">
@@ -372,7 +372,7 @@
 
                 <div class="form-group">
                     <label>Nominal (Rp)</label>
-                    <input type="text" id="nominalDisplay" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="0" required oninput="formatNominalInput(this)">
+                    <input type="text" id="nominalDisplay" inputmode="numeric" class="form-control" placeholder="0" required oninput="formatNominalInput(this)">
                     <input type="hidden" id="nominal" value="0">
                 </div>
 
@@ -532,7 +532,7 @@
                 <div class="row-2">
                     <div class="form-group">
                         <label>Nominal Utang (Rp)</label>
-                        <input type="text" id="piutangNominalDisplay" inputmode="numeric" pattern="[0-9]*" class="form-control" placeholder="0" required oninput="formatNominalCustom(this, 'piutangNominal')">
+                        <input type="text" id="piutangNominalDisplay" inputmode="numeric" class="form-control" placeholder="0" required oninput="formatNominalCustom(this, 'piutangNominal')">
                         <input type="hidden" id="piutangNominal" value="0">
                     </div>
                     <div class="form-group">
@@ -1025,7 +1025,7 @@
                 gridSaldo.innerHTML += `
                     <div>
                         <label style="font-size:9.5px; font-weight:600;">${s}</label>
-                        <input type="text" id="saldoAwalDisplay_${s}" inputmode="numeric" pattern="[0-9]*" class="form-control" style="padding:4px 6px; font-size:10px;" value="${formattedVal}" placeholder="0" oninput="formatSaldoAwalInput(this, 'saldoAwal_${s}')">
+                        <input type="text" id="saldoAwalDisplay_${s}" inputmode="numeric" class="form-control" style="padding:4px 6px; font-size:10px;" value="${formattedVal}" placeholder="0" oninput="formatSaldoAwalInput(this, 'saldoAwal_${s}')">
                         <input type="hidden" id="saldoAwal_${s}" value="${val}">
                     </div>
                 `;
