@@ -344,6 +344,13 @@
             <div class="card-header" id="formHeader">+ Input Transaksi Baru</div>
             <form id="formTrx">
                 <input type="hidden" id="editIndex" value="-1">
+                
+                <!-- REVISI 1: INPUT TANGGAL TRANSAKSI -->
+                <div class="form-group">
+                    <label>Tanggal Transaksi</label>
+                    <input type="date" id="tglTransaksi" class="form-control" required>
+                </div>
+
                 <div class="form-group">
                     <label>Keterangan Transaksi</label>
                     <input type="text" id="keterangan" list="listVlookup" class="form-control" placeholder="Ketik keterangan (JAJAN, BENSIN...)" autocomplete="off" required>
@@ -480,6 +487,38 @@
 
     <!-- TAB 5: REKAP SALDO -->
     <div id="tab-saldo" class="tab-content">
+        <!-- REVISI 2: MENU PINDAH SALDO DI TAB REKAP SALDO -->
+        <div class="card">
+            <div class="card-header card-header-blue">
+                <span>🔄 Pindah Saldo / Transfer</span>
+                <button class="btn-toggle" onclick="toggleModal('modalPindahSaldoTabSaldo')">Buka / Tutup</button>
+            </div>
+            <div id="modalPindahSaldoTabSaldo" class="modal-box">
+                <form id="formPindahSaldoTabSaldo">
+                    <div class="row-2">
+                        <div class="form-group">
+                            <label>Dari Akun</label>
+                            <select id="pindahDariTabSaldo" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ke Akun</label>
+                            <select id="pindahKeTabSaldo" class="form-control" required></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Nominal (Rp)</label>
+                        <input type="text" id="pindahNominalDisplayTabSaldo" inputmode="numeric" class="form-control" placeholder="0" required oninput="formatNominalCustom(this, 'pindahNominalTabSaldo')">
+                        <input type="hidden" id="pindahNominalTabSaldo" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Catatan Singkat</label>
+                        <input type="text" id="pindahCatatanTabSaldo" class="form-control" placeholder="Tarik tunai, Setor SeaBank...">
+                    </div>
+                    <button type="submit" class="btn" style="background-color:#0284C7;">Proses Pindah Saldo</button>
+                </form>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header">
                 <span>⚙ Saldo Awal</span>
@@ -622,6 +661,18 @@
         let selectedDateFilter = 'ALL';
         let selectedDateFilterPembukuan = 'ALL';
 
+        // SET DEFAULT TANGGAL TRANSAKSI KE HARI INI
+        function setTodayDateInput() {
+            const tglEl = document.getElementById('tglTransaksi');
+            if (tglEl && !tglEl.value) {
+                const skrg = new Date();
+                const yyyy = skrg.getFullYear();
+                const mm = String(skrg.getMonth() + 1).padStart(2, '0');
+                const dd = String(skrg.getDate()).padStart(2, '0');
+                tglEl.value = `${yyyy}-${mm}-${dd}`;
+            }
+        }
+
         const formatRp = (num) => {
             if (num === null || num === undefined || isNaN(num)) return '-';
             if (num < 0) return '-Rp' + Math.abs(num).toLocaleString('id-ID');
@@ -751,6 +802,7 @@
                 statusEl.style.color = '#15803D';
                 statusEl.innerText = '⚡ Terhubung Realtime (Instan Sync Active)';
                 
+                setTodayDateInput();
                 initDropdowns();
                 initSaldoGrid();
                 renderTables();
@@ -964,14 +1016,22 @@
             const vAkun = document.getElementById('v_akun');
             const pDari = document.getElementById('pindahDari');
             const pKe = document.getElementById('pindahKe');
+            const pDariTabSaldo = document.getElementById('pindahDariTabSaldo');
+            const pKeTabSaldo = document.getElementById('pindahKeTabSaldo');
             const pSumber = document.getElementById('piutangSumberSaldo');
 
-            selAkun.innerHTML = ''; vAkun.innerHTML = ''; pDari.innerHTML = ''; pKe.innerHTML = ''; pSumber.innerHTML = '';
+            selAkun.innerHTML = ''; vAkun.innerHTML = ''; 
+            pDari.innerHTML = ''; pKe.innerHTML = ''; 
+            pDariTabSaldo.innerHTML = ''; pKeTabSaldo.innerHTML = ''; 
+            pSumber.innerHTML = '';
+
             saldoList.forEach(s => {
                 selAkun.innerHTML += `<option value="${s}">${s}</option>`;
                 vAkun.innerHTML += `<option value="${s}">${s}</option>`;
                 pDari.innerHTML += `<option value="${s}">${s}</option>`;
                 pKe.innerHTML += `<option value="${s}">${s}</option>`;
+                pDariTabSaldo.innerHTML += `<option value="${s}">${s}</option>`;
+                pKeTabSaldo.innerHTML += `<option value="${s}">${s}</option>`;
                 pSumber.innerHTML += `<option value="${s}">${s}</option>`;
             });
 
@@ -1041,13 +1101,8 @@
             toggleModal('saldoModal');
         };
 
-        document.getElementById('formPindahSaldo').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const dari = document.getElementById('pindahDari').value;
-            const ke = document.getElementById('pindahKe').value;
-            const nom = parseFloat(document.getElementById('pindahNominal').value) || 0;
-            const ket = document.getElementById('pindahCatatan').value.trim();
-
+        // HELPER SCRIPT PINDAH SALDO
+        function eksekusiPindahSaldo(dari, ke, nom, ket, modalId, formId, inputNominalId) {
             if (dari === ke) {
                 alert("Akun asal dan akun tujuan tidak boleh sama!");
                 return;
@@ -1090,10 +1145,30 @@
             transaksiJurnal.unshift(trxKeluar);
 
             saveToFirebase();
-            document.getElementById('formPindahSaldo').reset();
-            document.getElementById('pindahNominal').value = '0';
-            toggleModal('modalPindahSaldo');
+            document.getElementById(formId).reset();
+            document.getElementById(inputNominalId).value = '0';
+            toggleModal(modalId);
             alert(`Berhasil memindahkan saldo ${formatRp(nom)} dari ${dari} ke ${ke}!`);
+        }
+
+        // HANDLER PINDAH SALDO TAB 1
+        document.getElementById('formPindahSaldo').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const dari = document.getElementById('pindahDari').value;
+            const ke = document.getElementById('pindahKe').value;
+            const nom = parseFloat(document.getElementById('pindahNominal').value) || 0;
+            const ket = document.getElementById('pindahCatatan').value.trim();
+            eksekusiPindahSaldo(dari, ke, nom, ket, 'modalPindahSaldo', 'formPindahSaldo', 'pindahNominal');
+        });
+
+        // HANDLER PINDAH SALDO TAB 5 (REKAP SALDO)
+        document.getElementById('formPindahSaldoTabSaldo').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const dari = document.getElementById('pindahDariTabSaldo').value;
+            const ke = document.getElementById('pindahKeTabSaldo').value;
+            const nom = parseFloat(document.getElementById('pindahNominalTabSaldo').value) || 0;
+            const ket = document.getElementById('pindahCatatanTabSaldo').value.trim();
+            eksekusiPindahSaldo(dari, ke, nom, ket, 'modalPindahSaldoTabSaldo', 'formPindahSaldoTabSaldo', 'pindahNominalTabSaldo');
         });
 
         document.getElementById('formPiutang').addEventListener('submit', function(e) {
@@ -1214,9 +1289,11 @@
             toggleModal('modalVlookup');
         });
 
+        // FORM SUBMIT INPUT TRANSAKSI (DENGAN REVISI PILIHAN TANGGAL)
         document.getElementById('formTrx').addEventListener('submit', function(e) {
             e.preventDefault();
             const editIdx = parseInt(document.getElementById('editIndex').value);
+            const inputTglVal = document.getElementById('tglTransaksi').value;
             const ket = document.getElementById('keterangan').value;
             const kat = document.getElementById('kategori').value;
             const jenisKas = document.getElementById('jenisKas').value;
@@ -1225,10 +1302,21 @@
 
             let waktuStr, isoDateStr;
             const skrg = new Date();
+            const jamMenit = `${String(skrg.getHours()).padStart(2, '0')}:${String(skrg.getMinutes()).padStart(2, '0')}`;
 
-            if (editIdx >= 0 && transaksiJurnal[editIdx]) {
-                waktuStr = transaksiJurnal[editIdx].waktu;
-                isoDateStr = extractIsoDate(transaksiJurnal[editIdx].isoDate, waktuStr);
+            if (inputTglVal) {
+                const parts = inputTglVal.split('-');
+                const yyyy = parts[0];
+                const mm = parts[1];
+                const dd = parts[2];
+                isoDateStr = `${yyyy}-${mm}-${dd}`;
+                
+                const tglPilihan = new Date(yyyy, parseInt(mm) - 1, dd);
+                const opsiHari = { weekday: 'short' };
+                const namaHari = tglPilihan.toLocaleDateString('id-ID', opsiHari);
+                
+                // Format Tampilan Waktu
+                waktuStr = `${namaHari}, ${dd}/${mm}/${yyyy.substring(2)} ${jamMenit}`;
             } else {
                 const opsiTgl = { weekday: 'short', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' };
                 waktuStr = skrg.toLocaleDateString('id-ID', opsiTgl);
@@ -1271,6 +1359,7 @@
             window.switchTab(null, 'tab-harian');
 
             document.getElementById('editIndex').value = index;
+            document.getElementById('tglTransaksi').value = extractIsoDate(t.isoDate, t.waktu);
             document.getElementById('keterangan').value = t.keterangan;
             document.getElementById('kategori').value = t.jenis;
             document.getElementById('jenisKas').value = t.jenisKas;
@@ -1289,6 +1378,7 @@
         window.cancelEdit = function() {
             document.getElementById('editIndex').value = '-1';
             document.getElementById('formTrx').reset();
+            setTodayDateInput();
             document.getElementById('nominal').value = '0';
             document.getElementById('nominalDisplay').value = '';
             document.getElementById('formHeader').innerText = '+ Input Transaksi Baru';
